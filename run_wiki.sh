@@ -35,7 +35,7 @@ export OMP_NUM_THREADS=8
 # Use distributed data parallel
 # If you only want to use one card, uncomment the following line and comment the line with "torch.distributed.launch"
 # python train.py \
-python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT_ID train.py \
+python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT_ID /cluster/customapps/medinfmk/xiaochen/SimCSE/train.py \
     --model_name_or_path bert-base-uncased \
     --train_file /cluster/customapps/medinfmk/xiaochen/SimCSE/data/data/wiki1m_for_simcse.txt \
     --output_dir /cluster/work/medinfmk/MedVLM/ckpt/simcse/wiki-unsup-simcse-bert-base-uncased \
