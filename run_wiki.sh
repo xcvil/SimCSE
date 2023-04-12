@@ -37,7 +37,7 @@ export OMP_NUM_THREADS=8
 # python train.py \
 python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT_ID /cluster/customapps/medinfmk/xiaochen/SimCSE/train.py \
     --model_name_or_path bert-base-uncased \
-    --train_file /cluster/customapps/medinfmk/xiaochen/SimCSE/data/data/wiki1m_for_simcse.txt \
+    --train_file /cluster/customapps/medinfmk/xiaochen/SimCSE/data/wiki1m_for_simcse.txt \
     --output_dir /cluster/work/medinfmk/MedVLM/ckpt/simcse/wiki-unsup-simcse-bert-base-uncased \
     --num_train_epochs 3 \
     --per_device_train_batch_size 8 \
