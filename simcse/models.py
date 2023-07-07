@@ -83,6 +83,7 @@ class Pooler(nn.Module):
             raise NotImplementedError
 
 
+# what is cls? cls is self here
 def cl_init(cls, config):
     """
     Contrastive learning class init function.
@@ -111,6 +112,8 @@ def cl_forward(cls,
 ):
     return_dict = return_dict if return_dict is not None else cls.config.use_return_dict
     ori_input_ids = input_ids
+    # original inputs_ids shape: batch_size * sent_nums * len
+    # sent_nums 为2 或者 3 ，代表二元组或者三元组任务
     batch_size = input_ids.size(0)
     # Number of sentences in one instance
     # 2: pair instance; 3: pair instance with a hard negative
@@ -124,6 +127,7 @@ def cl_forward(cls,
         token_type_ids = token_type_ids.view((-1, token_type_ids.size(-1))) # (bs * num_sent, len)
 
     # Get raw embeddings
+    # Encoder is BertModel(config, add_pooling_layer=False)
     outputs = encoder(
         input_ids,
         attention_mask=attention_mask,
@@ -152,6 +156,7 @@ def cl_forward(cls,
         )
 
     # Pooling
+    # pooling 之后得到句向量，因此 sent_len 这一维被消掉 
     pooler_output = cls.pooler(attention_mask, outputs)
     pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
 
@@ -162,7 +167,7 @@ def cl_forward(cls,
 
     # Separate representation
     z1, z2 = pooler_output[:,0], pooler_output[:,1]
-
+    # 得到对比学习的正样本，后续计算loss
     # Hard negative
     if num_sent == 3:
         z3 = pooler_output[:, 2]
@@ -190,7 +195,7 @@ def cl_forward(cls,
         # Get full batch embeddings: (bs x N, hidden)
         z1 = torch.cat(z1_list, 0)
         z2 = torch.cat(z2_list, 0)
-
+    # 相似度计算，bs*1*hidden 和 1*bs*hidden 得到 一个batch内的相似度矩阵 bs * bs
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
     # Hard negative
     if num_sent >= 3:
@@ -208,7 +213,7 @@ def cl_forward(cls,
             [[0.0] * (cos_sim.size(-1) - z1_z3_cos.size(-1)) + [0.0] * i + [z3_weight] + [0.0] * (z1_z3_cos.size(-1) - i - 1) for i in range(z1_z3_cos.size(-1))]
         ).to(cls.device)
         cos_sim = cos_sim + weights
-
+    
     loss = loss_fct(cos_sim, labels)
 
     # Calculate loss for MLM
