@@ -16,6 +16,9 @@ from transformers.file_utils import (
 )
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
+from spectral_clustering import spectral_clustering, pairwise_cosine_similarity, KMeans
+
+
 class MLPLayer(nn.Module):
     """
     Head for getting sentence representations over RoBERTa/BERT's CLS representation.
@@ -81,6 +84,29 @@ class Pooler(nn.Module):
             return pooled_result
         else:
             raise NotImplementedError
+
+
+def grouping(features_groupDis1, features_groupDis2, T, config):
+    # print(features_groupDis1.size())
+    criterion = nn.CrossEntropyLoss().cuda()
+    # K-way normalized cuts or k-Means. Default: k-Means
+    if config.use_kmeans:
+        cluster_label1, centroids1 = KMeans(features_groupDis1, K=config.clusters, Niters=config.num_iters)
+        cluster_label2, centroids2 = KMeans(features_groupDis2, K=config.clusters, Niters=config.num_iters)
+    else:
+        cluster_label1, centroids1 = spectral_clustering(features_groupDis1, K=config.k_eigen,
+                    clusters=config.clusters, Niters=config.num_iters)
+        cluster_label2, centroids2 = spectral_clustering(features_groupDis2, K=config.k_eigen,
+                    clusters=config.clusters, Niters=config.num_iters)
+
+    # group discriminative learning
+    affnity1 = torch.mm(features_groupDis1, centroids2.t())
+    CLD_loss = criterion(affnity1.div_(T), cluster_label2)
+
+    affnity2 = torch.mm(features_groupDis2, centroids1.t())
+    CLD_loss = (CLD_loss + criterion(affnity2.div_(T), cluster_label1))/2
+
+    return CLD_loss
 
 
 # what is cls? cls is self here
@@ -213,8 +239,10 @@ def cl_forward(cls,
             [[0.0] * (cos_sim.size(-1) - z1_z3_cos.size(-1)) + [0.0] * i + [z3_weight] + [0.0] * (z1_z3_cos.size(-1) - i - 1) for i in range(z1_z3_cos.size(-1))]
         ).to(cls.device)
         cos_sim = cos_sim + weights
-    
+
     loss = loss_fct(cos_sim, labels)
+    loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
+
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:

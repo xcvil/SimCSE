@@ -175,6 +175,25 @@ class DataTrainingArguments:
         metadata={"help": "Ratio of tokens to mask for MLM (only effective if --do_mlm)"}
     )
 
+     # Clustering's arguments
+    #  loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
+    cluster_loss_lambda: float = field(
+        default=0.01, 
+        metadata={"help": "Weight of clustering loss in the total loss"}
+    )
+    cluster_t: float = field(
+        default=0.01, 
+        metadata={"help": "cluster temp"}
+    )
+    num_iters: int = field(
+        default=32
+    )
+    clusters: int = field(
+        default=8
+    )
+    use_kmeans: bool = field(
+        default=True
+    )
     def __post_init__(self):
         if self.dataset_name is None and self.train_file is None and self.validation_file is None:
             raise ValueError("Need either a dataset name or a training/validation file.")
