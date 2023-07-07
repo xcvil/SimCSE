@@ -175,7 +175,7 @@ class DataTrainingArguments:
         metadata={"help": "Ratio of tokens to mask for MLM (only effective if --do_mlm)"}
     )
 
-     # Clustering's arguments
+    # Clustering's arguments
     #  loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
     cluster_loss_lambda: float = field(
         default=0.01, 
@@ -186,7 +186,7 @@ class DataTrainingArguments:
         metadata={"help": "cluster temp"}
     )
     num_iters: int = field(
-        default=32
+        default=100
     )
     clusters: int = field(
         default=8

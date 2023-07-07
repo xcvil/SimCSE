@@ -86,13 +86,16 @@ class Pooler(nn.Module):
             raise NotImplementedError
 
 
-def grouping(features_groupDis1, features_groupDis2, T, config):
+def grouping(features_groupDis1, features_groupDis2, T=0.05, config=None):
     # print(features_groupDis1.size())
     criterion = nn.CrossEntropyLoss().cuda()
     # K-way normalized cuts or k-Means. Default: k-Means
-    if config.use_kmeans:
-        cluster_label1, centroids1 = KMeans(features_groupDis1, K=config.clusters, Niters=config.num_iters)
-        cluster_label2, centroids2 = KMeans(features_groupDis2, K=config.clusters, Niters=config.num_iters)
+    # if config.use_kmeans:
+        # cluster_label1, centroids1 = KMeans(features_groupDis1, K=config.clusters, Niters=config.num_iters)
+        # cluster_label2, centroids2 = KMeans(features_groupDis2, K=config.clusters, Niters=config.num_iters)
+    if True:
+        cluster_label1, centroids1 = KMeans(features_groupDis1, K=8, Niters=100)
+        cluster_label2, centroids2 = KMeans(features_groupDis2, K=8, Niters=100)
     else:
         cluster_label1, centroids1 = spectral_clustering(features_groupDis1, K=config.k_eigen,
                     clusters=config.clusters, Niters=config.num_iters)
@@ -241,8 +244,8 @@ def cl_forward(cls,
         cos_sim = cos_sim + weights
 
     loss = loss_fct(cos_sim, labels)
-    loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
-
+    # loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
+    loss += 0.05 * grouping(z1, z2)
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:
