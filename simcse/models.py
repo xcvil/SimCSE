@@ -16,7 +16,7 @@ from transformers.file_utils import (
 )
 from transformers.modeling_outputs import SequenceClassifierOutput, BaseModelOutputWithPoolingAndCrossAttentions
 
-from spectral_clustering import spectral_clustering, pairwise_cosine_similarity, KMeans
+from .spectral_clustering import spectral_clustering, pairwise_cosine_similarity, KMeans
 
 
 class MLPLayer(nn.Module):
