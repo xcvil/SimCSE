@@ -86,7 +86,7 @@ def KMeans(x, K=10, Niters=10, verbose=False):
         # As some clusters don't contain any samples, manually assign count as 1
         labels_count_all = torch.ones([K]).long().cuda()
         labels_count_all[unique_labels[:,0]] = labels_count
-        c = torch.zeros([K, D], dtype=torch.float).cuda().scatter_add_(0, Ncl, x)
+        c = torch.zeros([K, D], dtype=x.dtype).cuda().scatter_add_(0, Ncl, x)
         c = c / labels_count_all.float().unsqueeze(1)
 
     return cl, c
@@ -117,7 +117,7 @@ def spectral_clustering(F, K=10, clusters=10, Niters=10, sigma=1):
     labels_count_all[unique_labels[:,0]] = labels_count
 
     # Calcualte feature centroids
-    c = torch.zeros([clusters, F.size(1)], dtype=torch.float).cuda().scatter_add_(0, Ncl, F)
+    c = torch.zeros([clusters, F.size(1)], dtype=F.dtype).cuda().scatter_add_(0, Ncl, F)
     c = c / labels_count_all.float().unsqueeze(1)
 
     return cl, c

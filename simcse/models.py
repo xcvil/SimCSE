@@ -94,8 +94,8 @@ def grouping(features_groupDis1, features_groupDis2, T=0.05, config=None):
         # cluster_label1, centroids1 = KMeans(features_groupDis1, K=config.clusters, Niters=config.num_iters)
         # cluster_label2, centroids2 = KMeans(features_groupDis2, K=config.clusters, Niters=config.num_iters)
     if True:
-        cluster_label1, centroids1 = KMeans(features_groupDis1, K=8, Niters=100)
-        cluster_label2, centroids2 = KMeans(features_groupDis2, K=8, Niters=100)
+        cluster_label1, centroids1 = KMeans(features_groupDis1, K=4, Niters=100)
+        cluster_label2, centroids2 = KMeans(features_groupDis2, K=4, Niters=100)
     else:
         cluster_label1, centroids1 = spectral_clustering(features_groupDis1, K=config.k_eigen,
                     clusters=config.clusters, Niters=config.num_iters)
@@ -122,6 +122,7 @@ def cl_init(cls, config):
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
+    cls.cluster_head = MLPLayer(config)
     cls.init_weights()
 
 def cl_forward(cls,
@@ -185,22 +186,32 @@ def cl_forward(cls,
         )
 
     # Pooling
-    # pooling 之后得到句向量，因此 sent_len 这一维被消掉 
+    # Pooling 之后得到句向量，因此 sent_len 这一维被消掉
+    # 因为The bare Bert Model transformer outputting raw hidden-states without any specific head on top.
+    # So the output of BertModel() is bs x sent_len x hidden
     pooler_output = cls.pooler(attention_mask, outputs)
-    pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden)
-
+    pooler_output = pooler_output.view((batch_size, num_sent, pooler_output.size(-1))) # (bs, num_sent, hidden), 
+    # which means, at the begining, input the same sentence twice
     # If using "cls", we add an extra MLP layer
     # (same as BERT's original implementation) over the representation.
+    # Disable for eval
     if cls.pooler_type == "cls":
-        pooler_output = cls.mlp(pooler_output)
-
+        cl_embedding = cls.mlp(pooler_output)
+    else:
+        cl_embedding = pooler_output
+    
     # Separate representation
-    z1, z2 = pooler_output[:,0], pooler_output[:,1]
+    z1, z2 = cl_embedding[:,0], cl_embedding[:,1]
     # 得到对比学习的正样本，后续计算loss
     # Hard negative
     if num_sent == 3:
-        z3 = pooler_output[:, 2]
+        z3 = cl_embedding[:, 2]
 
+    cluster_embedding = cls.cluster_head(pooler_output)
+    # Separate representation
+    zc1, zc2 = cluster_embedding[:,0], cluster_embedding[:,1]
+    zc1, zc2 = nn.functional.normalize(zc1, dim=1), nn.functional.normalize(zc2, dim=1)
+    
     # Gather all embeddings if using distributed training
     if dist.is_initialized() and cls.training:
         # Gather hard negative
@@ -224,6 +235,22 @@ def cl_forward(cls,
         # Get full batch embeddings: (bs x N, hidden)
         z1 = torch.cat(z1_list, 0)
         z2 = torch.cat(z2_list, 0)
+
+        # Dummy vectors for allgather
+        zc1_list = [torch.zeros_like(zc1) for _ in range(dist.get_world_size())]
+        zc2_list = [torch.zeros_like(zc2) for _ in range(dist.get_world_size())]
+        # Allgather
+        dist.all_gather(tensor_list=zc1_list, tensor=zc1.contiguous())
+        dist.all_gather(tensor_list=zc2_list, tensor=zc2.contiguous())
+
+        # Since allgather results do not have gradients, we replace the
+        # current process's corresponding embeddings with original tensors
+        zc1_list[dist.get_rank()] = zc1
+        zc2_list[dist.get_rank()] = zc2
+        # Get full batch embeddings: (bs x N, hidden)
+        zc1 = torch.cat(zc1_list, 0)
+        zc2 = torch.cat(zc2_list, 0)
+
     # 相似度计算，bs*1*hidden 和 1*bs*hidden 得到 一个batch内的相似度矩阵 bs * bs
     cos_sim = cls.sim(z1.unsqueeze(1), z2.unsqueeze(0))
     # Hard negative
@@ -245,7 +272,7 @@ def cl_forward(cls,
 
     loss = loss_fct(cos_sim, labels)
     # loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
-    loss += 0.05 * grouping(z1, z2)
+    loss += 0.01 * grouping(zc1, zc2)
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:
