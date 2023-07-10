@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from matplotlib import pyplot as plt
 # from pykeops.torch import LazyTensor
 
-use_cuda = torch.cuda.is_available()
-dtype = 'float32' if use_cuda else 'float64'
-torchtype = {'float32': torch.float32, 'float64': torch.float64}
+# use_cuda = torch.cuda.is_available()
+# dtype = 'float32' if use_cuda else 'float64'
+# torchtype = {'float32': torch.float32, 'float64': torch.float64}
 
 def embeddings_to_cosine_similarity(E, sigma=1.0):
     '''
@@ -50,7 +50,10 @@ def kway_normcuts(F, K=2, sigma=1.0):
     L = torch.matmul(torch.matmul(D_pow, torch.diag(degree)-W), D_pow)
 
     # Get eigenvectors with torch.symeig()
+    # Solve the RuntimeError: "symeig_cuda" not implemented for 'Half'
+    L = L.float()
     _, eigenvector = torch.symeig(L, eigenvectors=True)
+    # _, eigenvector = torch.eig(L, eigenvectors=True)
 
     # Normalize eigenvector along each row
     eigvec_norm = torch.matmul(torch.diag(degree.pow(-0.5)), eigenvector)
