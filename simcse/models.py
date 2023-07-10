@@ -35,6 +35,26 @@ class MLPLayer(nn.Module):
 
         return x
 
+   
+class ClusterHead(nn.Module):
+    """
+    Head for getting sentence representations over RoBERTa/BERT's CLS representation.
+    """
+
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = nn.ReLU()
+        self.dense2 = nn.Linear(config.hidden_size, config.hidden_size)
+
+    def forward(self, features, **kwargs):
+        x = self.dense(features)
+        x = self.activation(x)
+        x = self.dense2(x)
+
+        return x
+
+
 class Similarity(nn.Module):
     """
     Dot product or cosine similarity
@@ -122,7 +142,7 @@ def cl_init(cls, config):
     if cls.model_args.pooler_type == "cls":
         cls.mlp = MLPLayer(config)
     cls.sim = Similarity(temp=cls.model_args.temp)
-    cls.cluster_head = MLPLayer(config)
+    cls.cluster_head = ClusterHead(config)
     cls.init_weights()
 
 def cl_forward(cls,
