@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --output=/cluster/work/medinfmk/MedVLM/output/output_%J.txt
-#SBATCH --error=/cluster/work/medinfmk/MedVLM/error/error_%j.txt
+#SBATCH --output=/cluster/work/medinfmk/MedVLM/output/output_%J.log
+#SBATCH --error=/cluster/work/medinfmk/MedVLM/error/error_%j.log
 #SBATCH --job-name=sim                  # create a short name for your job
 #SBATCH --partition=gpu
 #SBATCH --nodes=1                       # node count
@@ -37,8 +37,8 @@ export OMP_NUM_THREADS=8
 python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT_ID train.py \
     --model_name_or_path bert-base-uncased \
     --train_file data/wiki1m_for_simcse.txt \
-    --output_dir result/wiki-unsup-simcse-bert-base-uncased-3090 \
-    --num_train_epochs 3 \
+    --output_dir result/wiki-unsup-simcse-bert-base-uncased-clustering \
+    --num_train_epochs 1 \
     --per_device_train_batch_size 64 \
     --learning_rate 3e-5 \
     --max_seq_length 32 \
@@ -49,9 +49,10 @@ python -m torch.distributed.launch --nproc_per_node $NUM_GPU --master_port $PORT
     --pooler_type cls \
     --overwrite_output_dir \
     --temp 0.05 \
-    --cluster_loss_lambda 0.05 \
+    --cluster_loss_lambda 0.01 \
     --cluster_t 0.05 \
-    --num_iters 100 \
+    --num_iters 10 \
+    --use_kmeans \
     --do_train \
     --do_eval \
     --fp16 \

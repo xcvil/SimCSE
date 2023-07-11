@@ -106,16 +106,16 @@ class Pooler(nn.Module):
             raise NotImplementedError
 
 
-def grouping(features_groupDis1, features_groupDis2, T=0.05, config=None):
+def grouping(cls, features_groupDis1, features_groupDis2):
     # print(features_groupDis1.size())
     criterion = nn.CrossEntropyLoss().cuda()
     # K-way normalized cuts or k-Means. Default: k-Means
     # if config.use_kmeans:
         # cluster_label1, centroids1 = KMeans(features_groupDis1, K=config.clusters, Niters=config.num_iters)
         # cluster_label2, centroids2 = KMeans(features_groupDis2, K=config.clusters, Niters=config.num_iters)
-    if True:
-        cluster_label1, centroids1 = KMeans(features_groupDis1, K=4, Niters=100)
-        cluster_label2, centroids2 = KMeans(features_groupDis2, K=4, Niters=100)
+    if cls.model_args.use_kmeans:
+        cluster_label1, centroids1 = KMeans(features_groupDis1, K=cls.model_args.clusters, Niters=cls.model_args.num_iters)
+        cluster_label2, centroids2 = KMeans(features_groupDis2, K=cls.model_args.clusters, Niters=cls.model_args.num_iters)
     else:
         cluster_label1, centroids1 = spectral_clustering(features_groupDis1, K=config.k_eigen,
                     clusters=config.clusters, Niters=config.num_iters)
@@ -124,10 +124,10 @@ def grouping(features_groupDis1, features_groupDis2, T=0.05, config=None):
 
     # group discriminative learning
     affnity1 = torch.mm(features_groupDis1, centroids2.t())
-    CLD_loss = criterion(affnity1.div_(T), cluster_label2)
+    CLD_loss = criterion(affnity1.div_(cls.model_args.cluster_t), cluster_label2)
 
     affnity2 = torch.mm(features_groupDis2, centroids1.t())
-    CLD_loss = (CLD_loss + criterion(affnity2.div_(T), cluster_label1))/2
+    CLD_loss = (CLD_loss + criterion(affnity2.div_(cls.model_args.cluster_t), cluster_label1))/2
 
     return CLD_loss
 
@@ -292,7 +292,7 @@ def cl_forward(cls,
 
     loss = loss_fct(cos_sim, labels)
     # loss += cls.config.cluster_loss_lambda * grouping(z1, z2, cls.config.cluster_t, cls.config)
-    loss += 0.01 * grouping(zc1, zc2)
+    loss += cls.model_args.cluster_loss_lambda * grouping(cls, zc1, zc2)
 
     # Calculate loss for MLM
     if mlm_outputs is not None and mlm_labels is not None:
